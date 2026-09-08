@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ewidencja grobów</title>
+<style>
+body{font-family:Arial,sans-serif;margin:0;background:#f3f4f6;color:#222}
+header{background:#263238;color:#fff;padding:20px;text-align:center;position:sticky;top:0;z-index:5}
+h1{margin:2px 0;font-size:28px}
+h2{margin-top:4px}
+main{max-width:900px;margin:auto;padding:14px}
+.card{background:#fff;border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 2px 8px #0001}
+input,select,textarea,button{width:100%;box-sizing:border-box;padding:11px;margin:5px 0;border:1px solid #ccc;border-radius:9px;font-size:16px}
+button{background:#37474f;color:#fff;border:0;font-weight:bold;cursor:pointer}
+button.red{background:#b3261e}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.item{border:1px solid #ddd;border-radius:10px;padding:12px;margin:8px 0}
+.small{font-size:13px;color:#666}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+@media(max-width:600px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><div style="font-size:38px">🪦</div><h1>Groby Pro</h1><div>Twoja firma • ewidencja zleceń</div></header>
+<main>
+<div class="card" id="dashboard">
+<h2>📊 Panel główny</h2>
+<div class="grid">
+<div class="item"><b id="count">0</b><br><span class="small">Wszystkie zlecenia</span></div>
+<div class="item"><b id="done">0</b><br><span class="small">Opłacone</span></div>
+<div class="item"><b id="todo">0</b><br><span class="small">Nieopłacone</span></div>
+<div class="item"><b id="sum">0 zł</b><br><span class="small">Wartość zleceń</span></div>
+</div>
+</div>
+<div class="card">
+<h2>➕ Nowe zlecenie</h2>
+<div class="grid">
+<input id="client" placeholder="Imię i nazwisko klienta">
+<input id="phone" placeholder="Telefon">
+<input id="cemetery" placeholder="Cmentarz">
+<input id="grave" placeholder="Numer / lokalizacja grobu">
+<input id="date" type="date">
+<select id="service"><option>Sprzątanie grobu</option><option>Sprzątanie po pogrzebie</option><option>Mycie nagrobka</option><option>Kompleksowe sprzątanie</option><option>Inna usługa</option></select>
+<input id="price" type="number" step="0.01" placeholder="Cena (zł)">
+<select id="paid"><option>Nieopłacone</option><option>Opłacone</option></select>
+</div>
+<textarea id="notes" placeholder="Uwagi, np. kwiaty, znicze, zakres prac"></textarea>
+<button onclick="add()">ZAPISZ ZLECENIE</button>
+</div>
+
+<div class="card">
+<h2>🔎 Zlecenia</h2>
+<input id="search" placeholder="Szukaj po kliencie, cmentarzu lub grobie" oninput="render()">
+<div id="list"></div>
+</div>
+
+<div class="card">
+<h2>💾 Kopia danych</h2>
+<button onclick="backup()">POBIERZ KOPIĘ DANYCH</button>
+<input type="file" id="file" accept=".json" onchange="restore(event)">
+<div class="small">Dane są zapisywane w pamięci tej przeglądarki. Kopię warto pobierać regularnie.</div>
+</div>
+</main>
+<script>
+let data=JSON.parse(localStorage.getItem('groby')||'[]');
+document.getElementById('date').value=new Date().toISOString().slice(0,10);
+function save(){localStorage.setItem('groby',JSON.stringify(data));render()}
+function add(){
+ let o={id:Date.now(),client:client.value,phone:phone.value,cemetery:cemetery.value,grave:grave.value,date:date.value,service:service.value,price:price.value,paid:paid.value,notes:notes.value};
+ if(!o.client && !o.cemetery && !o.grave){alert('Wpisz przynajmniej klienta, cmentarz lub lokalizację grobu.');return}
+ data.unshift(o); save();
+ ['client','phone','cemetery','grave','price','notes'].forEach(x=>document.getElementById(x).value='');
+ document.getElementById('date').value=new Date().toISOString().slice(0,10);
+ alert('Zlecenie zapisane!');
+}
+function render(){
+ document.getElementById('count').textContent=data.length;
+ document.getElementById('done').textContent=data.filter(x=>x.paid==='Opłacone').length;
+ document.getElementById('todo').textContent=data.filter(x=>x.paid!=='Opłacone').length;
+ document.getElementById('sum').textContent=data.reduce((s,x)=>s+(parseFloat(x.price)||0),0).toFixed(2)+' zł';
+ let q=document.getElementById('search').value.toLowerCase();
+ let arr=data.filter(x=>(x.client+' '+x.cemetery+' '+x.grave+' '+x.phone).toLowerCase().includes(q));
+ list.innerHTML=arr.length?arr.map(x=>`<div class="item">
+ <b>🪦 ${x.client||'Bez nazwiska'}</b><br>
+ 📍 ${x.cemetery||'-'} | ${x.grave||'-'}<br>
+ 📞 ${x.phone||'-'}<br>
+ 📅 ${x.date||'-'}<br>
+ 🧹 ${x.service} | 💰 ${x.price||'0'} zł | <b>${x.paid}</b>
+ ${x.notes?'<br>📝 '+x.notes:''}
+ <div class="actions"><button onclick="mark(${x.id})">${x.paid==='Opłacone'?'Oznacz nieopłacone':'Oznacz opłacone'}</button><button class="red" onclick="del(${x.id})">USUŃ</button></div>
+ </div>`).join(''):'<p>Brak zleceń.</p>';
+}
+function mark(id){let x=data.find(a=>a.id===id);x.paid=x.paid==='Opłacone'?'Nieopłacone':'Opłacone';save()}
+function del(id){if(confirm('Usunąć zlecenie?')){data=data.filter(x=>x.id!==id);save()}}
+function backup(){
+ let blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+ let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ewidencja-grobow-kopia.json';a.click();
+}
+function restore(e){
+ let f=e.target.files[0];if(!f)return;
+ let r=new FileReader();r.onload=()=>{try{data=JSON.parse(r.result);save();alert('Dane przywrócone!')}catch{alert('Nieprawidłowa kopia.')}};r.readAsText(f)
+}
+render();
+</script>
+<div style="position:sticky;bottom:0;background:#263238;padding:8px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+<button onclick="window.scrollTo({top:0,behavior:'smooth'})">🏠 PANEL</button>
+<button onclick="document.getElementById('client').focus();window.scrollTo({top:0,behavior:'smooth'})">➕ DODAJ</button>
+</div></body></html>
