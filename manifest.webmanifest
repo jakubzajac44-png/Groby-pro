@@ -1,0 +1,10 @@
+{
+  "name": "Groby Pro",
+  "short_name": "Groby Pro",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#263238",
+  "description": "Ewidencja zleceń firmy sprzątającej groby"
+}
