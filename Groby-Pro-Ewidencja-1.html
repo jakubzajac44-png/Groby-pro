@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f6f43">
+<title>Ewidencja grobów – Groby Pro</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f4f6f5;color:#17211b}
+header{background:#1f6f43;color:#fff;padding:18px 14px;position:sticky;top:0;z-index:5}
+header h1{margin:0;font-size:23px}
+header p{margin:5px 0 0;font-size:13px;opacity:.9}
+main{max-width:900px;margin:auto;padding:14px}
+.card{background:#fff;border-radius:14px;padding:15px;margin-bottom:14px;box-shadow:0 2px 9px #0001}
+h2{font-size:18px;margin:0 0 12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{font-weight:700;font-size:13px;display:block}
+input,select,textarea,button{font:inherit}
+input,select,textarea{width:100%;margin-top:5px;padding:11px;border:1px solid #cbd4ce;border-radius:9px;background:#fff}
+textarea{min-height:75px;resize:vertical}
+.full{grid-column:1/-1}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+button{border:0;border-radius:9px;padding:11px 14px;font-weight:700;cursor:pointer}
+.primary{background:#1f6f43;color:#fff}
+.secondary{background:#e8efeb;color:#173d29}
+.danger{background:#b52b2b;color:#fff}
+.small{padding:8px 10px;font-size:13px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.toolbar input{flex:1;min-width:200px;margin:0}
+.stat{font-size:14px;color:#53615a;margin-top:8px}
+.client{border:1px solid #dbe2dd;border-radius:11px;padding:12px;margin-top:10px}
+.client h3{margin:0 0 7px;font-size:17px}
+.client p{margin:4px 0;font-size:14px}
+.badge{display:inline-block;background:#e7f3eb;color:#1f6f43;border-radius:20px;padding:4px 8px;font-size:12px;font-weight:700}
+.hidden{display:none}
+.empty{text-align:center;color:#65736b;padding:18px}
+@media(max-width:650px){.grid{grid-template-columns:1fr}.full{grid-column:auto}main{padding:10px}.card{padding:12px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🪦 Groby Pro – Ewidencja grobów</h1>
+  <p>Klienci zapisują się na tym urządzeniu. Bez Supabase i bez logowania.</p>
+</header>
+
+<main>
+<section class="card">
+  <h2 id="formTitle">➕ Dodaj klienta</h2>
+  <form id="clientForm">
+    <div class="grid">
+      <div>
+        <label>Imię i nazwisko klienta
+          <input id="name" required placeholder="np. Jan Kowalski">
+        </label>
+      </div>
+      <div>
+        <label>Telefon
+          <input id="phone" type="tel" placeholder="np. 662 995 011">
+        </label>
+      </div>
+      <div>
+        <label>Cmentarz
+          <input id="cemetery" placeholder="np. Cmentarz Krzęcin">
+        </label>
+      </div>
+      <div>
+        <label>Numer grobu
+          <input id="grave" placeholder="np. A-12 / kwatera 4">
+        </label>
+      </div>
+      <div>
+        <label>Osoba pochowana
+          <input id="deceased" placeholder="np. Jan Kowalski">
+        </label>
+      </div>
+      <div>
+        <label>Rodzaj usługi
+          <select id="service">
+            <option>Sprzątanie nagrobka</option>
+            <option>Sprzątanie po pogrzebie</option>
+            <option>Mycie nagrobka</option>
+            <option>Mycie + impregnacja</option>
+            <option>Pielęgnacja otoczenia</option>
+            <option>Kompleksowe sprzątanie</option>
+            <option>Inna usługa</option>
+          </select>
+        </label>
+      </div>
+      <div>
+        <label>Cena (zł)
+          <input id="price" type="number" min="0" step="0.01" placeholder="np. 120">
+        </label>
+      </div>
+      <div>
+        <label>Data sprzątania
+          <input id="date" type="date">
+        </label>
+      </div>
+      <div class="full">
+        <label>Uwagi
+          <textarea id="notes" placeholder="Np. zamówić znicz, zdjęcie po wykonaniu, dodatkowe ustalenia..."></textarea>
+        </label>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="primary" type="submit" id="saveBtn">💾 Zapisz klienta</button>
+      <button class="secondary hidden" type="button" id="cancelBtn">Anuluj edycję</button>
+      <button class="secondary" type="reset">Wyczyść formularz</button>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>🔎 Klienci</h2>
+  <div class="toolbar">
+    <input id="search" placeholder="Szukaj po nazwisku, telefonie, cmentarzu lub grobie...">
+    <button class="secondary" id="exportBtn">📥 Kopia danych</button>
+    <button class="secondary" id="importBtn">📤 Wczytaj kopię</button>
+    <input id="fileInput" type="file" accept=".json" class="hidden">
+  </div>
+  <div class="stat" id="stats"></div>
+  <div id="clients"></div>
+</section>
+</main>
+
+<script>
+const KEY = "grobyProKlienci";
+let clients = JSON.parse(localStorage.getItem(KEY) || "[]");
+let editingId = null;
+
+const $ = id => document.getElementById(id);
+
+function saveAll(){
+  localStorage.setItem(KEY, JSON.stringify(clients));
+}
+
+function today(){
+  return new Date().toISOString().slice(0,10);
+}
+$("date").value = today();
+
+function money(v){
+  const n = Number(v);
+  return isNaN(n) ? "—" : n.toFixed(2) + " zł";
+}
+
+function escapeHtml(v){
+  return String(v ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[c]));
+}
+
+function render(){
+  const q = $("search").value.trim().toLowerCase();
+  const filtered = clients.filter(c =>
+    [c.name,c.phone,c.cemetery,c.grave,c.deceased,c.service,c.notes]
+      .join(" ").toLowerCase().includes(q)
+  );
+
+  $("stats").textContent = `Zapisanych klientów: ${clients.length} • Wyświetlanych: ${filtered.length}`;
+
+  if(!filtered.length){
+    $("clients").innerHTML = `<div class="empty">${clients.length ? "Brak wyników wyszukiwania." : "Nie ma jeszcze klientów. Dodaj pierwszego powyżej."}</div>`;
+    return;
+  }
+
+  $("clients").innerHTML = filtered.map(c => `
+    <div class="client">
+      <h3>${escapeHtml(c.name)} ${c.phone ? `<span class="badge">${escapeHtml(c.phone)}</span>` : ""}</h3>
+      <p><b>📍 Cmentarz:</b> ${escapeHtml(c.cemetery || "—")} ${c.grave ? ` | <b>Grób:</b> ${escapeHtml(c.grave)}` : ""}</p>
+      <p><b>🕯️ Pochowany/a:</b> ${escapeHtml(c.deceased || "—")}</p>
+      <p><b>🧹 Usługa:</b> ${escapeHtml(c.service || "—")} | <b>💰 Cena:</b> ${money(c.price)}</p>
+      <p><b>📅 Data:</b> ${escapeHtml(c.date || "—")}</p>
+      ${c.notes ? `<p><b>📝 Uwagi:</b> ${escapeHtml(c.notes)}</p>` : ""}
+      <div class="actions">
+        <button class="secondary small" onclick="editClient('${c.id}')">✏️ Edytuj</button>
+        <button class="danger small" onclick="deleteClient('${c.id}')">🗑️ Usuń</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+$("clientForm").addEventListener("submit", e => {
+  e.preventDefault();
+
+  const data = {
+    name: $("name").value.trim(),
+    phone: $("phone").value.trim(),
+    cemetery: $("cemetery").value.trim(),
+    grave: $("grave").value.trim(),
+    deceased: $("deceased").value.trim(),
+    service: $("service").value,
+    price: $("price").value,
+    date: $("date").value,
+    notes: $("notes").value.trim()
+  };
+
+  if(editingId){
+    const i = clients.findIndex(c => c.id === editingId);
+    if(i >= 0) clients[i] = {...clients[i], ...data};
+    editingId = null;
+    $("formTitle").textContent = "➕ Dodaj klienta";
+    $("saveBtn").textContent = "💾 Zapisz klienta";
+    $("cancelBtn").classList.add("hidden");
+  }else{
+    clients.unshift({id: Date.now().toString(), ...data});
+  }
+
+  saveAll();
+  e.target.reset();
+  $("date").value = today();
+  render();
+  window.scrollTo({top:0,behavior:"smooth"});
+});
+
+window.editClient = function(id){
+  const c = clients.find(x => x.id === id);
+  if(!c) return;
+  editingId = id;
+  $("name").value = c.name || "";
+  $("phone").value = c.phone || "";
+  $("cemetery").value = c.cemetery || "";
+  $("grave").value = c.grave || "";
+  $("deceased").value = c.deceased || "";
+  $("service").value = c.service || "Sprzątanie nagrobka";
+  $("price").value = c.price || "";
+  $("date").value = c.date || today();
+  $("notes").value = c.notes || "";
+  $("formTitle").textContent = "✏️ Edytuj klienta";
+  $("saveBtn").textContent = "💾 Zapisz zmiany";
+  $("cancelBtn").classList.remove("hidden");
+  window.scrollTo({top:0,behavior:"smooth"});
+};
+
+window.deleteClient = function(id){
+  const c = clients.find(x => x.id === id);
+  if(!c) return;
+  if(confirm(`Usunąć klienta "${c.name}"?`)){
+    clients = clients.filter(x => x.id !== id);
+    saveAll();
+    render();
+  }
+};
+
+$("cancelBtn").addEventListener("click", () => {
+  editingId = null;
+  $("clientForm").reset();
+  $("date").value = today();
+  $("formTitle").textContent = "➕ Dodaj klienta";
+  $("saveBtn").textContent = "💾 Zapisz klienta";
+  $("cancelBtn").classList.add("hidden");
+});
+
+$("search").addEventListener("input", render);
+
+$("exportBtn").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(clients,null,2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "groby-pro-kopia-danych.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+$("importBtn").addEventListener("click", () => $("fileInput").click());
+
+$("fileInput").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const imported = JSON.parse(reader.result);
+      if(!Array.isArray(imported)) throw new Error();
+      if(confirm(`Wczytać ${imported.length} klientów? Zastąpi to obecne dane.`)){
+        clients = imported;
+        saveAll();
+        render();
+      }
+    }catch{
+      alert("Nieprawidłowy plik kopii danych.");
+    }
+    e.target.value = "";
+  };
+  reader.readAsText(file);
+});
+
+render();
+</script>
+</body>
+</html>
